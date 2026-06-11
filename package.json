@@ -1,0 +1,52 @@
+{
+  "name": "sorting-visualizer",
+  "version": "1.0.0",
+  "description": "排序算法可视化测试 - 桌面版",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "keywords": [
+    "sorting",
+    "algorithm",
+    "visualization",
+    "electron"
+  ],
+  "author": "Developer",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.example.sorting-visualizer",
+    "productName": "排序算法可视化",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "main.js",
+      "preload.js",
+      "styles.css",
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "signingHashAlgorithms": [],
+      "sign": false
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

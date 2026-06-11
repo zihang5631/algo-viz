@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序算法可视化测试 - 桌面版</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ==================== 应用工具栏 ==================== -->
+    <header class="app-toolbar">
+        <div class="toolbar-brand">
+            <span class="toolbar-icon">📊</span>
+            <span class="toolbar-title">排序算法可视化测试</span>
+            <span class="toolbar-version">v1.0.0</span>
+        </div>
+        <nav class="toolbar-actions">
+            <button id="exportData" class="toolbar-btn" title="导出数据">
+                <span class="btn-icon">📤</span>
+                <span class="btn-text">导出数据</span>
+            </button>
+            <button id="saveSession" class="toolbar-btn" title="保存会话">
+                <span class="btn-icon">💾</span>
+                <span class="btn-text">保存会话</span>
+            </button>
+            <button id="appInfo" class="toolbar-btn" title="应用信息">
+                <span class="btn-icon">ℹ️</span>
+                <span class="btn-text">应用信息</span>
+            </button>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- ==================== 页面标题 ==================== -->
+        <section class="page-header">
+            <h1>🔮 排序算法可视化测试</h1>
+            <p class="page-subtitle">直观展示不同排序算法的工作原理和性能表现</p>
+        </section>
+
+        <!-- ==================== 主布局：侧边栏 + 主内容 ==================== -->
+        <div class="main-layout">
+            <!-- 侧边栏：参数配置、算法选择、操作控制 -->
+            <aside class="sidebar">
+                <!-- 操作控制组（置顶） -->
+                <div class="control-group" data-group="actions">
+                    <h2 class="group-title">
+                        <span class="title-icon">🎮</span>
+                        操作控制
+                    </h2>
+                    <div class="group-content">
+                        <div class="action-grid">
+                            <button class="action-btn action-primary" id="generateArray">
+                                <span class="action-icon">🔄</span>
+                                <span class="action-text">生成新数组</span>
+                            </button>
+                            <button class="action-btn action-success" id="startSort">
+                                <span class="action-icon">▶️</span>
+                                <span class="action-text">开始排序</span>
+                            </button>
+                            <button class="action-btn action-warning" id="stepSort">
+                                <span class="action-icon">⏭️</span>
+                                <span class="action-text">单步执行</span>
+                            </button>
+                            <button class="action-btn action-danger" id="reset">
+                                <span class="action-icon">⏹️</span>
+                                <span class="action-text">重置</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 参数配置组 -->
+                <div class="control-group" data-group="parameters">
+                    <h2 class="group-title">
+                        <span class="title-icon">⚙️</span>
+                        参数配置
+                    </h2>
+                    <div class="group-content">
+                        <div class="param-item">
+                            <label class="param-label" for="arraySize">数组大小</label>
+                            <div class="param-control">
+                                <input type="range" id="arraySize" min="10" max="100" value="30" class="param-slider">
+                                <output id="sizeValue" class="param-value">30</output>
+                            </div>
+                        </div>
+                        <div class="param-item">
+                            <label class="param-label" for="sortSpeed">排序速度</label>
+                            <div class="param-control">
+                                <input type="range" id="sortSpeed" min="10" max="500" value="100" class="param-slider">
+                                <output id="speedValue" class="param-value">100</output>
+                                <span class="param-unit">ms/步</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 算法选择组 -->
+                <div class="control-group" data-group="algorithms">
+                    <h2 class="group-title">
+                        <span class="title-icon">🔢</span>
+                        算法选择
+                    </h2>
+                    <div class="group-content">
+                        <div class="algorithm-grid">
+                            <button class="algo-btn active" data-algorithm="bubble">
+                                <span class="algo-name">冒泡排序</span>
+                                <span class="algo-tag">O(n²)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="selection">
+                                <span class="algo-name">选择排序</span>
+                                <span class="algo-tag">O(n²)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="insertion">
+                                <span class="algo-name">插入排序</span>
+                                <span class="algo-tag">O(n²)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="quick">
+                                <span class="algo-name">快速排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="merge">
+                                <span class="algo-name">归并排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="shell">
+                                <span class="algo-name">希尔排序</span>
+                                <span class="algo-tag">O(n log²n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="heap">
+                                <span class="algo-name">堆排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="counting">
+                                <span class="algo-name">计数排序</span>
+                                <span class="algo-tag">O(n+k)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="bucket">
+                                <span class="algo-name">桶排序</span>
+                                <span class="algo-tag">O(n+k)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="radix">
+                                <span class="algo-name">基数排序</span>
+                                <span class="algo-tag">O(nk)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="comb">
+                                <span class="algo-name">梳排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="oddeven">
+                                <span class="algo-name">奇偶排序</span>
+                                <span class="algo-tag">O(n²)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="cocktail">
+                                <span class="algo-name">鸡尾酒排序</span>
+                                <span class="algo-tag">O(n²)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="gnome">
+                                <span class="algo-name">地精排序</span>
+                                <span class="algo-tag">O(n²)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="patience">
+                                <span class="algo-name">耐心排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="library">
+                                <span class="algo-name">图书馆排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="block">
+                                <span class="algo-name">块排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="smooth">
+                                <span class="algo-name">平滑排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="tournament">
+                                <span class="algo-name">锦标赛排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="introsort">
+                                <span class="algo-name">内省排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                            <button class="algo-btn" data-algorithm="timsort">
+                                <span class="algo-name">蒂姆排序</span>
+                                <span class="algo-tag">O(n log n)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </aside>
+
+            <!-- 主内容区：可视化 + 信息 -->
+            <div class="main-content">
+                <!-- ==================== 可视化展示区 ==================== -->
+                <section class="visualization-section">
+                    <!-- 图表展示 -->
+                    <div class="chart-container">
+                        <div id="barsContainer" class="bars-wrapper"></div>
+                    </div>
+                    
+                    <!-- 实时统计 -->
+                    <div class="stats-bar">
+                        <div class="stat-item" data-stat="algorithm">
+                            <span class="stat-label">当前算法</span>
+                            <span id="currentAlgorithm" class="stat-value">冒泡排序</span>
+                        </div>
+                        <div class="stat-item" data-stat="comparisons">
+                            <span class="stat-label">比较次数</span>
+                            <span id="comparisons" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item" data-stat="swaps">
+                            <span class="stat-label">交换次数</span>
+                            <span id="swaps" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item" data-stat="size">
+                            <span class="stat-label">数组大小</span>
+                            <span id="arraySizeDisplay" class="stat-value">30</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== 算法信息区 ==================== -->
+                <section class="info-section">
+                    <div class="info-card" data-info="time-complexity">
+                        <h3 class="info-title">⏱️ 时间复杂度</h3>
+                        <table class="complexity-table">
+                            <thead>
+                                <tr>
+                                    <th>场景</th>
+                                    <th>复杂度</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="row-best">
+                                    <td>最好情况</td>
+                                    <td class="complexity-best">O(n)</td>
+                                </tr>
+                                <tr class="row-average">
+                                    <td>平均情况</td>
+                                    <td class="complexity-average">O(n²)</td>
+                                </tr>
+                                <tr class="row-worst">
+                                    <td>最坏情况</td>
+                                    <td class="complexity-worst">O(n²)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="info-card" data-info="space-complexity">
+                        <h3 class="info-title">💾 空间复杂度</h3>
+                        <div class="info-value">O(1)</div>
+                    </div>
+                    
+                    <div class="info-card" data-info="stability">
+                        <h3 class="info-title">⚖️ 稳定性</h3>
+                        <div class="info-value">稳定</div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script src="src/renderer.js"></script>
+</body>
+</html>

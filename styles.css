@@ -1,0 +1,638 @@
+/* ==================== 基础样式 ==================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ==================== 应用工具栏 ==================== */
+.app-toolbar {
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    color: white;
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.toolbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toolbar-icon {
+    font-size: 1.5em;
+}
+
+.toolbar-title {
+    font-weight: 700;
+    font-size: 1.1em;
+}
+
+.toolbar-version {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9em;
+}
+
+.toolbar-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.toolbar-btn .btn-icon {
+    font-size: 1.1em;
+}
+
+/* ==================== 主容器 ==================== */
+.container {
+    width: 100%;
+    max-width: 1920px;
+    margin: 0 auto;
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-sizing: border-box;
+}
+
+/* ==================== 侧边栏与主内容布局 ==================== */
+.main-layout {
+    display: flex;
+    gap: 20px;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+}
+
+/* 侧边栏：参数配置、算法选择、操作控制 */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 380px;
+    flex-shrink: 0;
+    max-height: calc(100vh - 180px);
+    overflow: hidden;
+}
+
+/* 主内容区：可视化 + 信息 */
+.main-content {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ==================== 页面标题 ==================== */
+.page-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+}
+
+.page-header h1 {
+    color: #2c3e50;
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.page-subtitle {
+    color: #7f8c8d;
+    font-size: 1.1em;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* 控制组：参数配置、算法选择、操作控制 */
+.control-group {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 算法选择组：内部可滚动 */
+.control-group[data-group="algorithms"] {
+    flex: 1 1 auto;
+    min-height: 240px;
+}
+
+.control-group[data-group="actions"] {
+    flex: 0 0 auto;
+}
+
+.control-group[data-group="algorithms"] .group-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin-right: -8px;
+    padding-right: 8px;
+}
+
+.group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #2c3e50;
+    font-size: 1.1em;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f1f2f6;
+}
+
+.title-icon {
+    font-size: 1.2em;
+}
+
+.group-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* 参数配置 */
+.param-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.param-label {
+    color: #34495e;
+    font-weight: 600;
+    font-size: 0.95em;
+}
+
+.param-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.param-slider {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #dfe6e9;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.param-slider:hover {
+    background: #bdc3c7;
+}
+
+.param-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3498db;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.param-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 3px 8px rgba(52, 152, 219, 0.4);
+}
+
+.param-value {
+    min-width: 50px;
+    text-align: center;
+    padding: 6px 12px;
+    background: #f1f2f6;
+    border-radius: 6px;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.95em;
+    border: 1px solid #e0e0e0;
+}
+
+.param-unit {
+    color: #7f8c8d;
+    font-size: 0.85em;
+}
+
+/* 算法选择 */
+.algorithm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.algo-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px;
+    background: white;
+    border: 2px solid #dfe6e9;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.algo-btn:hover {
+    border-color: #3498db;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(52, 152, 219, 0.15);
+}
+
+.algo-btn.active {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border-color: #3498db;
+    box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+}
+
+.algo-name {
+    font-weight: 600;
+    font-size: 0.95em;
+}
+
+.algo-tag {
+    font-size: 0.75em;
+    opacity: 0.8;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.algo-btn.active .algo-tag {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 操作按钮 */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.action-icon {
+    font-size: 1.2em;
+}
+
+.action-primary {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+}
+
+.action-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(52, 152, 219, 0.3);
+}
+
+.action-success {
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    color: white;
+}
+
+.action-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(46, 204, 113, 0.3);
+}
+
+.action-warning {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white;
+}
+
+.action-warning:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(243, 156, 18, 0.3);
+}
+
+.action-danger {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+.action-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(231, 76, 60, 0.3);
+}
+
+/* ==================== 可视化展示区 ==================== */
+.visualization-section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    margin-bottom: 30px;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.chart-container {
+    margin-bottom: 20px;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+}
+
+.bars-wrapper {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 350px;
+    gap: 2px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.bar {
+    flex: 1 1 0;
+    min-width: 0;
+    background: linear-gradient(to top, #3498db, #2980b9);
+    border-radius: 4px 4px 0 0;
+    transition: all 0.3s ease;
+    position: relative;
+    min-height: 1px;
+}
+
+.bar-label {
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: #2c3e50;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.bar:hover {
+    opacity: 0.8;
+    transform: translateY(-2px);
+}
+
+.bar.active {
+    background: linear-gradient(to top, #2ecc71, #27ae60);
+    box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+}
+
+.bar.comparing {
+    background: linear-gradient(to top, #e74c3c, #c0392b);
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+
+.bar.sorted {
+    background: linear-gradient(to top, #9b59b6, #8e44ad);
+    box-shadow: 0 0 10px rgba(155, 89, 182, 0.5);
+}
+
+/* 实时统计栏 */
+.stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 10px;
+}
+
+.stat-label {
+    display: block;
+    color: #7f8c8d;
+    font-size: 0.85em;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.stat-value {
+    font-size: 1.4em;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+/* ==================== 算法信息区 ==================== */
+.info-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.info-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.info-title {
+    color: #2c3e50;
+    font-size: 1em;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f1f2f6;
+}
+
+.info-value {
+    font-size: 1.8em;
+    font-weight: 700;
+    color: #2c3e50;
+    text-align: center;
+    padding: 10px;
+}
+
+/* 复杂度表格 */
+.complexity-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.complexity-table th,
+.complexity-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #f1f2f6;
+}
+
+.complexity-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.85em;
+    text-transform: uppercase;
+}
+
+.complexity-table tr:hover {
+    background: #f8f9fa;
+}
+
+.complexity-best {
+    color: #2ecc71;
+    font-weight: 600;
+}
+
+.complexity-average {
+    color: #f39c12;
+    font-weight: 600;
+}
+
+.complexity-worst {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 1024px) {
+    .main-layout {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .control-group {
+        flex: 1;
+        min-width: 280px;
+    }
+}
+
+@media (max-width: 768px) {
+    .app-toolbar {
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
+    }
+
+    .toolbar-actions {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .sidebar {
+        flex-direction: column;
+    }
+
+    .control-group {
+        min-width: 100%;
+    }
+
+    .action-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .page-header h1 {
+        font-size: 1.8em;
+    }
+
+    .bars-wrapper {
+        height: 250px;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-bar {
+        grid-template-columns: 1fr;
+    }
+
+    .algorithm-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==================== 滚动条样式 ==================== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #3498db;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #2980b9;
+}
