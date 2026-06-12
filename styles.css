@@ -118,6 +118,9 @@ body {
     flex-shrink: 0;
     min-height: 0;
     overflow: hidden;
+    /* 视觉分隔：与右侧主内容区明确分开 */
+    border-right: 1px solid #e9ecef;
+    padding-right: 16px;
 }
 
 /* 主内容区：可视化 + 信息 */
@@ -129,6 +132,9 @@ body {
     flex-direction: column;
     gap: 14px;
     overflow: hidden;
+    /* 右侧不自适应填满主布局高度 —— 只在合理范围内自适应 */
+    align-self: flex-start;
+    max-height: 100%;
 }
 
 /* ==================== 页面标题 ==================== */
@@ -404,8 +410,11 @@ body {
     width: 100%;
     box-sizing: border-box;
     min-width: 0;
-    flex: 1 1 auto;
-    min-height: 0;
+    /* 高度自适应在合理范围，防止窗口过高时图表过大、窗口过低时显示不全 */
+    flex: 0 0 auto;
+    height: 48vh;
+    min-height: 280px;
+    max-height: 460px;
     display: flex;
     flex-direction: column;
 }
