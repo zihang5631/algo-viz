@@ -11,9 +11,13 @@
     <header class="app-toolbar">
         <div class="toolbar-brand">
             <span class="toolbar-icon">📊</span>
-            <span class="toolbar-title">排序算法可视化测试</span>
-            <span class="toolbar-version">v1.0.0</span>
+            <span class="toolbar-version">v1.1.0</span>
         </div>
+        <div class="toolbar-title-block">
+            <h1 class="toolbar-title">排序算法可视化</h1>
+            <p class="toolbar-subtitle">直观展示不同排序算法的工作原理和性能表现</p>
+        </div>
+        <div class="toolbar-spacer"></div>
         <nav class="toolbar-actions">
             <button id="exportData" class="toolbar-btn" title="导出数据">
                 <span class="btn-icon">📤</span>
@@ -27,21 +31,84 @@
                 <span class="btn-icon">ℹ️</span>
                 <span class="btn-text">应用信息</span>
             </button>
+            <button id="appSettings" class="toolbar-btn" title="应用设置">
+                <span class="btn-icon">⚙️</span>
+                <span class="btn-text">设置</span>
+            </button>
         </nav>
     </header>
 
     <main class="container">
-        <!-- ==================== 页面标题 ==================== -->
-        <section class="page-header">
-            <h1>🔮 排序算法可视化测试</h1>
-            <p class="page-subtitle">直观展示不同排序算法的工作原理和性能表现</p>
-        </section>
+        <!-- 页面标题已上移至顶部工具栏中央 -->
+        <!-- 兼容空 page-header 节点供旧 CSS 引用 -->
 
-        <!-- ==================== 主布局：侧边栏 + 主内容 ==================== -->
+        <!-- ==================== 主布局：左侧导航 + 侧边栏 + 主内容 ==================== -->
         <div class="main-layout">
-            <!-- 侧边栏：参数配置、算法选择、操作控制 -->
-            <aside class="sidebar">
-                <!-- 操作控制组（置顶） -->
+            <!-- 最左侧竖列：双标签页（算法测试 / 测试数据） -->
+            <nav class="left-rail" aria-label="主导航">
+                <button class="left-rail-tab is-active" data-rail-tab="algo">
+                    <span class="left-rail-icon">🔬</span>
+                    <span class="left-rail-label">算法测试</span>
+                </button>
+                <button class="left-rail-tab" data-rail-tab="data">
+                    <span class="left-rail-icon">📁</span>
+                    <span class="left-rail-label">测试数据</span>
+                </button>
+            </nav>
+
+            <!-- ==================== 测试数据页（独立整页，默认隐藏） ==================== -->
+            <section class="data-page" id="dataPage" hidden>
+                <div class="data-page-header">
+                    <div>
+                        <h2 class="data-page-title">📁 测试数据</h2>
+                        <p class="data-page-hint">未保存与已保存的运行数据，支持自动分类和手动分类</p>
+                    </div>
+                    <div class="data-page-actions">
+                        <span id="dataDirtyHint" class="data-dirty-hint" hidden>⚠ 当前未保存的数据有改动，<a id="dataSaveAllLink" href="javascript:void(0)">一键保存</a></span>
+                        <button class="data-action-btn data-save-all-btn" id="saveAllUnsaved" title="把当前所有未保存运行一次性保存为磁盘文件">💾 一键保存</button>
+                    </div>
+                </div>
+
+                <!-- 分类模式切换 -->
+                <div class="classify-tabs" role="tablist">
+                    <button class="classify-tab is-active" data-classify-mode="auto">
+                        <span class="classify-tab-icon">🤖</span>
+                        <span>自动分类</span>
+                        <span class="classify-tab-hint">按算法分组</span>
+                    </button>
+                    <button class="classify-tab" data-classify-mode="manual">
+                        <span class="classify-tab-icon">🧷</span>
+                        <span>手动分类</span>
+                        <span class="classify-tab-hint">用户自定义分组</span>
+                    </button>
+                </div>
+
+                <!-- 数据源切换：未保存 / 已保存 -->
+                <div class="source-tabs" role="tablist">
+                    <button class="source-tab is-active" data-source-mode="all">全部 <span class="source-tab-count" id="srcCountAll">0</span></button>
+                    <button class="source-tab" data-source-mode="unsaved">未保存 <span class="source-tab-count" id="srcCountUnsaved">0</span></button>
+                    <button class="source-tab" data-source-mode="saved">已保存 <span class="source-tab-count" id="srcCountSaved">0</span></button>
+                </div>
+
+                <!-- 分类视图容器 -->
+                <div class="classify-container" id="classifyContainer">
+                    <div class="data-empty">暂无数据。请先在「算法测试」页运行排序。</div>
+                </div>
+
+                <!-- 手动分类管理：分组编辑 -->
+                <div class="manual-group-editor" id="manualGroupEditor" hidden>
+                    <h3 class="manual-group-title">手动分组管理</h3>
+                    <div class="manual-group-row">
+                        <input type="text" id="newGroupName" class="settings-input" placeholder="输入新分组名…" maxlength="32">
+                        <button class="data-action-btn" id="createGroupBtn">+ 新建分组</button>
+                    </div>
+                    <div class="manual-group-list" id="manualGroupList"></div>
+                </div>
+            </section>
+
+            <!-- 算法测试内容：控制侧栏 + 可视化主区 -->
+            <div class="sidebar algo-test-item">
+                <!-- 操作控制组 -->
                 <div class="control-group" data-group="actions">
                     <h2 class="group-title">
                         <span class="title-icon">🎮</span>
@@ -96,6 +163,20 @@
                                 <output id="speedValue" class="param-value">100</output>
                             </div>
                         </div>
+                        <div class="param-random-row">
+                            <label class="param-random-toggle">
+                                <input type="checkbox" id="randomArraySize" />
+                                <span class="param-random-label">🎲 随机数组大小</span>
+                            </label>
+                            <div class="param-random-hint">开启后：每次「开始」将在 10 - 100 范围内随机抽取数组大小。</div>
+                        </div>
+                        <div class="param-random-row">
+                            <label class="param-random-toggle">
+                                <input type="checkbox" id="randomSortSpeed" />
+                                <span class="param-random-label">🎲 随机排序速度</span>
+                            </label>
+                            <div class="param-random-hint">开启后：每次「开始」将在 10 - 500 ms/步 范围内随机抽取速度。</div>
+                        </div>
                     </div>
                 </div>
 
@@ -106,99 +187,15 @@
                         算法选择
                     </h2>
                     <div class="group-content">
-                        <div class="algorithm-grid">
-                            <button class="algo-btn active" data-algorithm="bubble">
-                                <span class="algo-name">冒泡排序</span>
-                                <span class="algo-tag">O(n²)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="selection">
-                                <span class="algo-name">选择排序</span>
-                                <span class="algo-tag">O(n²)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="insertion">
-                                <span class="algo-name">插入排序</span>
-                                <span class="algo-tag">O(n²)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="quick">
-                                <span class="algo-name">快速排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="merge">
-                                <span class="algo-name">归并排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="shell">
-                                <span class="algo-name">希尔排序</span>
-                                <span class="algo-tag">O(n log²n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="heap">
-                                <span class="algo-name">堆排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="counting">
-                                <span class="algo-name">计数排序</span>
-                                <span class="algo-tag">O(n+k)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="bucket">
-                                <span class="algo-name">桶排序</span>
-                                <span class="algo-tag">O(n+k)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="radix">
-                                <span class="algo-name">基数排序</span>
-                                <span class="algo-tag">O(nk)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="comb">
-                                <span class="algo-name">梳排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="oddeven">
-                                <span class="algo-name">奇偶排序</span>
-                                <span class="algo-tag">O(n²)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="cocktail">
-                                <span class="algo-name">鸡尾酒排序</span>
-                                <span class="algo-tag">O(n²)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="gnome">
-                                <span class="algo-name">地精排序</span>
-                                <span class="algo-tag">O(n²)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="patience">
-                                <span class="algo-name">耐心排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="library">
-                                <span class="algo-name">图书馆排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="block">
-                                <span class="algo-name">块排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="smooth">
-                                <span class="algo-name">平滑排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="tournament">
-                                <span class="algo-name">锦标赛排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="introsort">
-                                <span class="algo-name">内省排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
-                            <button class="algo-btn" data-algorithm="timsort">
-                                <span class="algo-name">蒂姆排序</span>
-                                <span class="algo-tag">O(n log n)</span>
-                            </button>
+                        <div class="algo-category-list" id="algoCategoryList">
+                            <!-- 6 个分类（折叠）由 renderer.js 渲染 -->
                         </div>
                     </div>
                 </div>
+            </div>
 
-            </aside>
-
-            <!-- 主内容区：可视化 + 信息 -->
-            <div class="main-content">
+            <!-- 主内容区：可视化 + 信息（单独一列） -->
+            <div class="main-content algo-test-item">
                 <!-- ==================== 可视化展示区 ==================== -->
                 <section class="visualization-section">
                     <!-- 图表展示 -->
@@ -244,6 +241,10 @@
                             <span class="stat-label">数组大小</span>
                             <span id="arraySizeDisplay" class="stat-value">30</span>
                         </div>
+                        <div class="stat-item" data-stat="elapsed">
+                            <span class="stat-label">排序计时</span>
+                            <span id="elapsedTime" class="stat-value">0.0s</span>
+                        </div>
                     </div>
                 </section>
 
@@ -288,6 +289,94 @@
             </div>
         </div>
     </main>
+
+    <!-- ==================== 设置对话框 ==================== -->
+    <div id="settingsModal" class="modal" aria-hidden="true">
+        <div class="modal-backdrop" data-close-modal="settingsModal"></div>
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title">⚙️ 应用设置</h2>
+                <button class="modal-close" data-close-modal="settingsModal" aria-label="关闭">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <h3 class="settings-group-title">💾 默认保存路径</h3>
+                    <p class="settings-group-hint">保存会话/导出数据时的默认目录</p>
+                    <div class="settings-row">
+                        <input type="text" id="defaultSavePath" class="settings-input" readonly placeholder="未设置">
+                        <button class="settings-browse-btn" id="browseSavePath">浏览…</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3 class="settings-group-title">📤 默认导出路径</h3>
+                    <p class="settings-group-hint">导出 CSV 时的默认目录（可与保存路径不同）</p>
+                    <div class="settings-row">
+                        <input type="text" id="defaultExportPath" class="settings-input" readonly placeholder="未设置">
+                        <button class="settings-browse-btn" id="browseExportPath">浏览…</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3 class="settings-group-title">♻️ 恢复默认</h3>
+                    <p class="settings-group-hint">把保存/导出路径重置为 文档/Algorithm-Visualization</p>
+                    <div class="settings-row">
+                        <button class="settings-browse-btn" id="resetPathsDefault">重置为默认</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3 class="settings-group-title">🗂️ 数据管理</h3>
+                    <p class="settings-group-hint">查看本会话内已记录的运行数据</p>
+                    <div class="settings-row">
+                        <span class="settings-info">已记录运行数：<b id="sessionRunCount">0</b></span>
+                        <button class="settings-clear-btn" id="clearSessionData">清空本会话记录</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" data-close-modal="settingsModal">取消</button>
+                <button class="modal-btn modal-btn-primary" id="saveSettings">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 文件数据可视化模态框 ==================== -->
+    <div id="fileDataModal" class="modal modal-wide" aria-hidden="true">
+        <div class="modal-backdrop" data-close-modal="fileDataModal"></div>
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <span class="title-icon">📊</span>
+                    <span id="fileDataTitle">文件数据</span>
+                </h3>
+                <button class="modal-close" data-close-modal="fileDataModal" aria-label="关闭">✕</button>
+            </div>
+            <div class="modal-body" id="fileDataBody">
+                <!-- 动态填充：摘要卡片 + 柱状图 + 表格 -->
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" data-close-modal="fileDataModal">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 单条运行详情 -->
+    <div id="runDetailModal" class="modal" aria-hidden="true">
+        <div class="modal-backdrop" data-close-modal="runDetailModal"></div>
+        <div class="modal-dialog modal-dialog-narrow">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <span class="title-icon">📊</span>
+                    <span id="runDetailTitle">运行详情</span>
+                </h3>
+                <button class="modal-close" data-close-modal="runDetailModal" aria-label="关闭">✕</button>
+            </div>
+            <div class="modal-body" id="runDetailBody">
+                <!-- 动态填充：大标题 + 键值对 + 散点图 -->
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" data-close-modal="runDetailModal">关闭</button>
+            </div>
+        </div>
+    </div>
 
     <script src="src/renderer.js"></script>
 </body>

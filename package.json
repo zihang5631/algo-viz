@@ -1,7 +1,7 @@
 {
-  "name": "sorting-visualizer",
-  "version": "1.0.0",
-  "description": "排序算法可视化测试 - 桌面版",
+  "name": "algo-viz",
+  "version": "1.1.0",
+  "description": "排序算法可视化 - 桌面版",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -21,10 +21,11 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "jsdom": "^29.1.1"
   },
   "build": {
-    "appId": "com.example.sorting-visualizer",
+    "appId": "com.example.algo-viz",
     "productName": "排序算法可视化",
     "directories": {
       "output": "dist"
