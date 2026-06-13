@@ -14,7 +14,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listHistory: (opts) => ipcRenderer.invoke('list-history', opts),
   readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
   deleteFile: (filePath) => ipcRenderer.invoke('delete-file', filePath),
-  onUpdateStats: (callback) => ipcRenderer.on('update-stats', callback)
+  onUpdateStats: (callback) => ipcRenderer.on('update-stats', callback),
+  onRequestCloseConfirm: (callback) => ipcRenderer.on('request-close-confirm', callback),
+  sendCloseConfirmResult: (confirmed) => ipcRenderer.send('confirm-close-result', confirmed)
 });
 
 contextBridge.exposeInMainWorld('appLogger', {

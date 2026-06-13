@@ -5,12 +5,16 @@ const fs = require('fs');
 let mainWindow;
 
 function createWindow() {
+  // 仅在图标文件存在时设置，避免空 assets 目录导致运行时报错
+  const iconPath = path.join(__dirname, 'assets', 'icon.png');
+  const iconOption = fs.existsSync(iconPath) ? { icon: iconPath } : {};
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1000,
     minHeight: 700,
-    icon: path.join(__dirname, 'assets/icon.png'),
+    ...iconOption,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -33,6 +37,38 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // 拦截窗口关闭：未保存时弹出确认
+  let isForceClosing = false;
+  let closeConfirmTimer = null;
+  mainWindow.on('close', (event) => {
+    if (isForceClosing) return;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    event.preventDefault();
+    // 渲染端可能因 devtools 打开或加载异常而无法响应；超时回退到允许关闭，
+    // 避免"卡住"无法退出
+    if (closeConfirmTimer) clearTimeout(closeConfirmTimer);
+    closeConfirmTimer = setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed() && !isForceClosing) {
+        isForceClosing = true;
+        mainWindow.close();
+      }
+    }, 30000);
+    try {
+      mainWindow.webContents.send('request-close-confirm');
+    } catch (e) {
+      if (closeConfirmTimer) { clearTimeout(closeConfirmTimer); closeConfirmTimer = null; }
+      isForceClosing = true;
+      mainWindow.close();
+    }
+  });
+  ipcMain.on('confirm-close-result', (event, confirmed) => {
+    if (closeConfirmTimer) { clearTimeout(closeConfirmTimer); closeConfirmTimer = null; }
+    if (confirmed) {
+      isForceClosing = true;
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+    }
   });
 }
 

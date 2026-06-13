@@ -994,6 +994,7 @@ class SortingVisualizer {
     
     async countingSort() {
         let n = this.array.length;
+        if (n === 0) return;
         let max = Math.max(...this.array);
         let min = Math.min(...this.array);
         let range = max - min + 1;
@@ -1587,8 +1588,8 @@ class SortingVisualizer {
             await this.sleep();
             k++;
         }
-        while (i < n1) { this.array[k] = L[i++]; this.swaps++; this.renderBars(); await this.sleep(); }
-        while (j < n2) { this.array[k] = R[j++]; this.swaps++; this.renderBars(); await this.sleep(); }
+        while (i < n1) { this.array[k] = L[i++]; this.swaps++; this.renderBars(); await this.sleep(); k++; }
+        while (j < n2) { this.array[k] = R[j++]; this.swaps++; this.renderBars(); await this.sleep(); k++; }
     }
     
     selectionSortSteps(array) {
@@ -2173,9 +2174,13 @@ class SortingVisualizer {
             const swaps = g.items.reduce((acc, r) => acc + (r.totalSwaps || 0), 0);
             const elapsedTotal = g.items.reduce((acc, r) => acc + (r.elapsedMs || 0), 0);
             const opsTotal = cmps + swaps;
-            // 平均交换步耗时 = 总耗时 / (比较+交换) ，单位 ms/步
-            const avgStepMs = opsTotal > 0 ? (elapsedTotal / opsTotal) : 0;
-            const avgStepUs = avgStepMs * 1000; // μs
+            // 各文件自身每步耗时（μs/步），用于显示上下区间
+            const perFileStepUs = g.items.map((r) => {
+                const ops = (r.totalComparisons || 0) + (r.totalSwaps || 0);
+                return ops > 0 ? ((r.elapsedMs || 0) * 1000) / ops : 0;
+            }).filter(v => v > 0);
+            const stepUsMin = perFileStepUs.length ? Math.min(...perFileStepUs) : 0;
+            const stepUsMax = perFileStepUs.length ? Math.max(...perFileStepUs) : 0;
             // 平均数组大小 / 平均耗时
             const avgSize = count ? Math.round(g.items.reduce((a, r) => a + (r.arraySize || 0), 0) / count) : 0;
             const avgElapsed = count ? elapsedTotal / count : 0;
@@ -2193,7 +2198,7 @@ class SortingVisualizer {
                         <span title="交换次数">⇄ ${swaps.toLocaleString()}</span>
                         <span title="累计耗时">⏱ ${this.formatElapsed(elapsedTotal)}</span>
                         <span title="平均耗时">⌀ ${this.formatElapsed(avgElapsed)}</span>
-                        <span title="平均交换步耗时" class="classify-group-stat-emph">⚡ ${avgStepUs.toFixed(2)} μs/步</span>
+                        <span title="各文件自身每步耗时的上下区间 (μs/步)" class="classify-group-stat-emph">⚡ ${stepUsMin.toFixed(2)} ~ ${stepUsMax.toFixed(2)} μs/步</span>
                         <span title="平均数组大小">📐 ${avgSize}</span>
                         ${count > 0 ? `<button class="classify-group-delete" data-group-delete="${this.escapeAttr(g.id)}" title="删除此分组内的所有文件（按文件去重）">🗑</button>` : ''}
                         <button class="classify-group-toggle" title="展开/折叠">▸</button>
@@ -2659,6 +2664,15 @@ class SortingVisualizer {
         svg.appendChild(grid);
 
         // 散点：每个点独立绘制，不连线
+        // 同一 (x,y) 上的点视为重叠：点击时弹出重叠点列表
+        const keyOf = (p) => `${p.x}|${p.y}`;
+        const clusterMap = new Map();
+        valid.forEach((p, ii) => {
+            const k = keyOf(p);
+            if (!clusterMap.has(k)) clusterMap.set(k, []);
+            clusterMap.get(k).push({ rr: p.r, ii });
+        });
+
         valid.forEach((p) => {
             const cx = xToPx(p.x);
             const cy = yToPx(p.y);
@@ -2670,7 +2684,7 @@ class SortingVisualizer {
             const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             c.setAttribute('cx', cx.toFixed(1));
             c.setAttribute('cy', cy.toFixed(1));
-            c.setAttribute('r', '3');
+            c.setAttribute('r', '6');
             c.setAttribute('fill', color);
             c.setAttribute('opacity', '0.85');
             c.setAttribute('class', 'algo-scatter-point');
@@ -2679,21 +2693,26 @@ class SortingVisualizer {
             c.appendChild(t);
             c.addEventListener('mouseenter', () => {
                 c.setAttribute('opacity', '1');
-                c.setAttribute('r', '4.5');
+                c.setAttribute('r', '8');
                 c.setAttribute('stroke', '#ffc107');
-                c.setAttribute('stroke-width', '1.5');
+                c.setAttribute('stroke-width', '1.8');
                 this.showPointTooltip(tipText, cx, cy, c);
             });
             c.addEventListener('mouseleave', () => {
                 c.setAttribute('opacity', '0.85');
-                c.setAttribute('r', '3');
+                c.setAttribute('r', '6');
                 c.removeAttribute('stroke');
                 c.removeAttribute('stroke-width');
                 this.hidePointTooltip();
             });
             c.addEventListener('click', (ev) => {
                 ev.stopPropagation();
-                this.jumpToRunRow(p.r);
+                const cluster = clusterMap.get(keyOf(p)) || [{ rr: p.r, ii: valid.indexOf(p) }];
+                if (cluster.length > 1) {
+                    this.showClusterPicker(cluster);
+                } else {
+                    this.jumpToRunRow(p.r);
+                }
             });
             svg.appendChild(c);
         });
@@ -3820,12 +3839,60 @@ class SortingVisualizer {
     // ==================== 退出/卸载守卫 ====================
     // 关闭页面前：如果有未保存的运行数据，弹出确认
     attachWindowUnloadGuard() {
+        // Electron 主进程拦截了 close 事件，通过 IPC 主动询问
+        if (window.electronAPI && window.electronAPI.onRequestCloseConfirm) {
+            window.electronAPI.onRequestCloseConfirm(() => {
+                this.handleCloseRequest();
+            });
+        }
+        // 兼容浏览器刷新/导航场景
         window.addEventListener('beforeunload', (e) => {
             if (this.unsavedCount > 0) {
                 e.preventDefault();
                 e.returnValue = `当前会话还有 ${this.unsavedCount} 条未保存的运行数据，确定要离开吗？`;
+                return e.returnValue;
             }
         });
+    }
+
+    // 处理来自主进程的关闭请求：未保存时弹确认框
+    async handleCloseRequest() {
+        const sendResult = (val) => {
+            try { window.electronAPI.sendCloseConfirmResult(val); } catch (e) {}
+        };
+        if (this._closeDialogShowing) {
+            // 防止重复弹出：当前一个对话框未关闭时，后续 close 请求都视为"返回"
+            sendResult(false);
+            return;
+        }
+        if (this.unsavedCount > 0) {
+            const detail = (this.unsavedCount === 1)
+                ? '当前会话还有 1 条未保存的运行数据，关闭后不会保存到磁盘。'
+                : `当前会话还有 ${this.unsavedCount} 条未保存的运行数据，关闭后不会保存到磁盘。`;
+            let result = -1;
+            this._closeDialogShowing = true;
+            try {
+                result = await window.electronAPI.confirmDialog({
+                    type: 'warning',
+                    title: '未保存的运行记录',
+                    message: `有 ${this.unsavedCount} 条未保存的运行记录`,
+                    detail: detail,
+                    buttons: ['返回', '放弃并退出'],
+                    defaultId: 0,
+                    cancelId: 0
+                });
+            } catch (e) {
+                // 极端情况下回退到浏览器确认
+                result = window.confirm(detail + '\n确定要退出吗？') ? 1 : 0;
+            } finally {
+                this._closeDialogShowing = false;
+            }
+            // 用户点 X（result 为 undefined/null）或点"返回"都视为取消
+            // result: 0 = 返回, 1 = 放弃并退出
+            sendResult(result === 1);
+        } else {
+            sendResult(true);
+        }
     }
     
     getSidebarWidth() {
