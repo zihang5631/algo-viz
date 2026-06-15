@@ -73,6 +73,37 @@ function readText(filePath) {
   return text;
 }
 
+// ==================== 路径字符串编码修复 ====================
+// 现象：中文 Windows 用户名（如"有辐同享"）+ Electron 28 + Node 24 的某些
+// 组合下，app.getPath / dialog.showOpenDialog 返回的字符串中，中文字符实际是
+// GBK 字节被错误地当 Latin-1 解释的产物（每 2 个 GBK 字节被压成 1 个 char code），
+// 直接显示会出现"颓宠微媪矶机"这类乱码。
+//
+// 修复启发式：把字符串视为 Latin-1 字节流，按 GBK 反向解码；
+// - 若解码结果不包含 U+FFFD（替换字符）且非空，认为修复成功；
+// - 否则保留原字符串（说明该字符串本身就是正确 UTF-16 编码）。
+function fixPathEncoding(p) {
+  if (!p) return p;
+  // 仅处理含非 ASCII 字符的字符串，纯 ASCII 路径无此问题
+  if (!/[^\x00-\x7f]/.test(p)) return p;
+  try {
+    const buf = Buffer.from(p, 'latin1');
+    const decoded = iconv.decode(buf, TEXT_ENCODING);
+    // 解码结果中不能含替换字符；且长度 > 0
+    if (decoded && decoded.length > 0 && !decoded.includes('\ufffd')) {
+      // 进一步验证：解码结果含中文字符才算"成功"（GBK 编码的特征）
+      // 避免误把 ASCII 字符串也通过 latin1 → GBK 转换
+      if (/[^\x00-\x7f]/.test(decoded)) {
+        debugLog('fixPathEncoding:fixed', { before: previewText(p), after: previewText(decoded) });
+        return decoded;
+      }
+    }
+  } catch (e) {
+    debugLog('fixPathEncoding:error', { message: e.message });
+  }
+  return p;
+}
+
 let mainWindow;
 
 function createWindow() {
@@ -85,6 +116,16 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 700,
+    // 隐藏原生窗口的"关闭 / 最小化 / 全屏"按钮：所有窗口控制都走应用内
+    // 自定义按钮（工具栏右上的 ⬇ / ⛶ / ⏻），避免用户用错原生控件。
+    closable: false,
+    minimizable: false,
+    maximizable: false,
+    // Windows 上隐藏 OS 原生标题栏（顶部那条灰色横条），仅保留可拖动
+    // + 调整大小边框。所有窗口控制由工具栏自定义按钮接管。
+    // 工具栏会通过 -webkit-app-region: drag 支持整窗拖动。
+    titleBarStyle: 'hidden',
+    title: '排序算法可视化',
     ...iconOption,
     webPreferences: {
       nodeIntegration: false,
@@ -110,34 +151,18 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // 拦截窗口关闭：有未保存数据时直接放行退出，不再弹模态确认窗口，
-  // 避免用户不点击确认时一直卡住。
-  // 注意：之前用 mainWindow.close() 二次触发 close 的方式在某些 Electron 版本
-  // 上仍会因 "已 preventDefault 的 close 事件" 状态被记住而导致窗口不关闭，
-  // 用户体验上表现为"卡住"。这里改用 mainWindow.destroy() 强制销毁，
-  // 该方法不触发 close 事件，可以彻底绕开循环。
-  let isForceClosing = false;
-  mainWindow.on('close', (event) => {
-    if (isForceClosing) {
-      // 二次进入：直接返回，不调用 preventDefault，让窗口正常关闭
-      return;
-    }
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    // 首次：拦截，做必要的清理
-    event.preventDefault();
-    isForceClosing = true;
-    // 异步强制销毁窗口：避免任何潜在的同步递归
-    setImmediate(() => {
-      try {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.destroy();
-        }
-      } catch (e) {
-        console.error('销毁窗口失败:', e);
-      }
-    });
-  });
+  // 注：原生窗口关闭按钮已通过 BrowserWindow.closable=false 禁用，
+  // 退出应用只能通过工具栏"退出程序"按钮触发 quit-app IPC。
+  // 拦截 close 事件已无必要，此处不再注册 close 监听。
 }
+
+// 拦截默认的 window-all-closed 行为：因 closable=false 时 app.quit() 不会
+// 自动销毁窗口，必须显式销毁并退出，否则进程会卡死。
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
 
 function createMenu() {
   // 不显示任何应用菜单（顶部菜单栏已移除）
@@ -154,6 +179,70 @@ ipcMain.handle('get-app-info', () => {
   } catch (e) {
     console.error('读取应用信息失败:', e);
     return { name: 'algo-viz', version: 'unknown', platform: process.platform || 'unknown' };
+  }
+});
+
+// 应用内"退出程序"按钮触发的 IPC：显式销毁窗口（因为 closable=false）→
+// 触发 window-all-closed → 走 app.quit() 完成正常退出流程
+ipcMain.handle('quit-app', () => {
+  debugLog('quit-app:enter');
+  try {
+    setImmediate(() => {
+      try {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          // destroy() 绕过 close 事件（closable=false 不会触发 close），
+          // 直接销毁窗口，触发 window-all-closed → app.quit()
+          mainWindow.destroy();
+        } else {
+          app.quit();
+        }
+        debugLog('quit-app:done', { quitting: true });
+      } catch (e) {
+        console.error('退出应用失败:', e);
+        debugLog('quit-app:destroy-error', { message: e.message });
+        // 兜底：万一 destroy 也失败，用 app.exit 强制退出
+        try { app.exit(0); } catch (_) {}
+      }
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error('退出应用失败:', e);
+    debugLog('quit-app:error', { message: e.message });
+    return { ok: false, error: e.message };
+  }
+});
+
+// 应用内"最小化"按钮：直接调用主进程 API 最小化窗口
+ipcMain.handle('minimize-window', () => {
+  debugLog('minimize-window:enter');
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.minimize();
+      return { ok: true };
+    }
+    return { ok: false, error: '主窗口不存在' };
+  } catch (e) {
+    debugLog('minimize-window:error', { message: e.message });
+    return { ok: false, error: e.message };
+  }
+});
+
+// 应用内"全屏"按钮：切换最大化状态
+ipcMain.handle('toggle-maximize-window', () => {
+  debugLog('toggle-maximize-window:enter');
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+      return { ok: true, isMaximized: mainWindow.isMaximized() };
+    }
+    return { ok: false, error: '主窗口不存在' };
+  } catch (e) {
+    debugLog('toggle-maximize-window:error', { message: e.message });
+    return { ok: false, error: e.message };
   }
 });
 
@@ -204,8 +293,10 @@ ipcMain.handle('choose-directory', async (event, defaultPath) => {
     debugLog('choose-directory:cancel');
     return null;
   }
-  debugLog('choose-directory:done', { chosen: result.filePaths[0] });
-  return result.filePaths[0];
+  // 修复 Windows 上中文路径被错误编码返回的乱码
+  const chosen = fixPathEncoding(result.filePaths[0]);
+  debugLog('choose-directory:done', { chosen });
+  return chosen;
 });
 
 // 选择保存文件路径（导出 CSV 用）
@@ -225,8 +316,10 @@ ipcMain.handle('choose-save-file', async (event, opts) => {
     debugLog('choose-save-file:cancel');
     return null;
   }
-  debugLog('choose-save-file:done', { chosen: result.filePath });
-  return result.filePath;
+  // 修复 Windows 上中文路径被错误编码返回的乱码
+  const chosen = fixPathEncoding(result.filePath);
+  debugLog('choose-save-file:done', { chosen });
+  return chosen;
 });
 
 // 弹出确认对话框（保存/退出/导出前的询问）
@@ -453,7 +546,7 @@ function settingsFilePath() {
 }
 
 function defaultBasePath() {
-  return path.join(app.getPath('documents'), 'algo-viz');
+  return path.join(fixPathEncoding(app.getPath('documents')), 'algo-viz');
 }
 
 function loadSettings() {

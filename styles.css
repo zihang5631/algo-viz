@@ -7,7 +7,8 @@
 
 /* ==================== 主容器 ==================== */
 html, body {
-    min-height: 100%;
+    height: 100%;
+    overflow: hidden;          /* 整窗固定：滚动由 .container 内部控制 */
 }
 
 body {
@@ -15,8 +16,7 @@ body {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     display: flex;
     flex-direction: column;
-    /* 解除高度锁定：允许内容超出窗口高度时整页可滚动 */
-    overflow-y: auto;
+    overflow: hidden;          /* 防止 body 自身出现滚动条 */
 }
 
 /* ==================== 应用工具栏 ==================== */
@@ -29,10 +29,16 @@ body {
     align-items: center;
     gap: 16px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    flex-shrink: 0;
+    flex-shrink: 0;             /* 工具栏高度固定，不参与滚动 */
+    /* OS 原生标题栏已通过 titleBarStyle:hidden 移除，此处接管窗口拖动 */
+    -webkit-app-region: drag;
+}
+
+/* 工具栏内的按钮必须关闭 drag，否则无法点击；文字块不关闭，让其可拖动 */
+.toolbar-brand,
+.toolbar-actions,
+.toolbar-btn {
+    -webkit-app-region: no-drag;
 }
 
 .toolbar-title-block {
@@ -77,13 +83,6 @@ body {
     font-size: 1.1em;
 }
 
-.toolbar-version {
-    background: rgba(255, 255, 255, 0.2);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8em;
-}
-
 /* 工具栏中间留白（标题已下移至内容区） */
 .toolbar-spacer {
     flex: 1 1 auto;
@@ -117,20 +116,49 @@ body {
     font-size: 1.1em;
 }
 
+/* 工具栏"退出程序"按钮：警示色调，与普通按钮区分 */
+.toolbar-btn-quit {
+    background: rgba(231, 76, 60, 0.18);
+    border-color: rgba(231, 76, 60, 0.5);
+}
+
+.toolbar-btn-quit:hover {
+    background: rgba(231, 76, 60, 0.85);
+    border-color: rgba(231, 76, 60, 1);
+}
+
+/* 工具栏窗口控制按钮（最小化 / 切换全屏）：中性灰色，与退出按钮区分 */
+.toolbar-btn-control {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.toolbar-btn-control:hover {
+    background: rgba(255, 255, 255, 0.30);
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+/* 工具栏右侧三按钮组合：紧凑排列，禁用 wrap */
+.toolbar-window-controls {
+    flex-wrap: nowrap;
+    gap: 6px;
+}
+
 /* ==================== 主容器 ==================== */
 .container {
     width: 100%;
     max-width: 1920px;
     margin: 0 auto;
     padding: 16px;
-    flex: 1;
-    min-height: 0;
+    flex: 1 1 auto;
+    min-height: 0;                 /* flex 子项必须 min-height:0 才能正常收缩滚动 */
     display: flex;
     flex-direction: column;
     gap: 14px;
     box-sizing: border-box;
-    /* 解除高度锁定：内容可自由伸展，超出窗口时由 body 整页滚动 */
-    overflow: visible;
+    /* 主滚动区域：滚动条只出现在容器右侧，工具栏保持固定 */
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* ==================== 侧边栏与主内容布局 ==================== */
@@ -203,8 +231,10 @@ body {
 .data-page-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
+    /* 与左侧标题在视觉上形成左右平衡 */
+    margin-left: auto;
 }
 
 .data-dirty-hint {
@@ -214,6 +244,7 @@ body {
     border-radius: 6px;
     padding: 4px 10px;
     font-size: 0.82em;
+    margin-right: 4px;            /* 与右侧按钮留一点空隙 */
 }
 
 .data-dirty-hint a {
@@ -223,18 +254,57 @@ body {
     margin-left: 2px;
 }
 
-.data-save-all-btn {
-    background: #2b8a3e;
-    color: #fff;
-    border: 0;
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
+/* ==================== 测试数据区——按钮统一规范 ==================== */
+/* 四个按钮（保存数据 / 导出数据 / 柱状图切换 / 一键保存）统一：
+ *   高度、padding、字号、圆角、边框宽度、图标-文字间距、hover 反馈。
+ * 视图切换"柱状图"单独配色（保留差异），但尺寸/边框/圆角/高度与其它保持一致。 */
+.data-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;                 /* 固定高度，让四个按钮基线对齐 */
+    padding: 0 14px;
     font-size: 0.85em;
     font-weight: 600;
+    line-height: 1;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    background: #ffffff;
+    color: #495057;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.05s ease;
 }
 
-.data-save-all-btn:hover { background: #237434; }
+.data-action-btn:hover {
+    background: #f1f3f5;
+    border-color: #adb5bd;
+    color: #212529;
+}
+
+.data-action-btn:active {
+    transform: translateY(1px);
+}
+
+.data-action-btn .btn-icon,
+.data-action-btn .chart-toggle-icon {
+    font-size: 1.05em;
+    line-height: 1;
+}
+
+/* 主操作"一键保存"：唯一带强强调色的按钮 */
+.data-save-all-btn {
+    background: #2b8a3e;
+    color: #ffffff;
+    border-color: #1e6b2e;
+}
+
+.data-save-all-btn:hover {
+    background: #237434;
+    border-color: #155724;
+    color: #ffffff;
+}
 
 .data-page-title {
     font-size: 1.15em;
@@ -472,17 +542,16 @@ body {
     pointer-events: none;     /* 基柱只作为视觉参考，不响应 hover/click */
 }
 
-/* 测试数据页 - 图表类型切换按钮 */
+/* 测试数据页 - 图表类型切换按钮（视图切换，单独配色以示状态） */
 .data-chart-toggle-btn {
-    background: #f1f3f5;
-    color: #495057;
-    border: 1px solid #dee2e6;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    background: #e7f5ff;
+    color: #1971c2;
+    border-color: #74c0fc;
 }
 .data-chart-toggle-btn:hover {
-    background: #e7f5ff;
-    border-color: #74c0fc;
-    color: #1971c2;
+    background: #d0ebff;
+    border-color: #339af0;
+    color: #1864ab;
 }
 .data-chart-toggle-btn[data-chart-type="scatter"] {
     background: #fff9db;
@@ -491,6 +560,8 @@ body {
 }
 .data-chart-toggle-btn[data-chart-type="scatter"]:hover {
     background: #fff3bf;
+    border-color: #fab005;
+    color: #876200;
 }
 
 .scatter-tooltip {
@@ -1837,6 +1908,11 @@ body {
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+/* 关于区块的单行信息：独占一行，避免多行挤在一起 */
+.settings-info-row {
+    padding: 4px 0;
 }
 
 .settings-input {

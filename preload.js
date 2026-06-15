@@ -11,7 +11,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   confirmDialog: (opts) => ipcRenderer.invoke('confirm-dialog', opts),
   listHistory: (opts) => ipcRenderer.invoke('list-history', opts),
   readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
-  deleteFile: (filePath) => ipcRenderer.invoke('delete-file', filePath)
+  deleteFile: (filePath) => ipcRenderer.invoke('delete-file', filePath),
+  // 应用内"退出程序"按钮：调用此方法结束应用
+  quitApp: () => ipcRenderer.invoke('quit-app'),
+  // 工具栏窗口控制按钮（最小化 / 切换最大化）
+  minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
+  toggleMaximizeWindow: () => ipcRenderer.invoke('toggle-maximize-window')
 });
 
 contextBridge.exposeInMainWorld('appLogger', {

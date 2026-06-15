@@ -1,6 +1,12 @@
 class SortingVisualizer {
     constructor() {
         this.array = [];
+        // 初始数组快照：每次"开始排序"前冻结；"重置"从此恢复，
+        // 避免协程原地交换污染 this.array 后重置仍显示已排序的状态。
+        this.initialArray = [];
+        // 重置请求：用户在协程中点重置时设为 true，协程 finally 看到后
+        // 不再把半成品推入 sessionData / unsavedCount。
+        this.resetRequested = false;
         this.arraySize = 30;
         this.speed = 100;
         this.currentAlgorithm = 'bubble';
@@ -11,8 +17,6 @@ class SortingVisualizer {
         this.sortingComplete = false;
         this.comparisons = 0;
         this.swaps = 0;
-        this.sortSteps = [];
-        this.currentStep = 0;
         // 调试开关：仅当 localStorage.ALGO_VIZ_DEBUG=1 时启用 IPC/路径详细日志
         this.debug = (typeof localStorage !== 'undefined') && (localStorage.getItem('ALGO_VIZ_DEBUG') === '1');
         this._previewLimit = 200;
@@ -78,13 +82,18 @@ class SortingVisualizer {
     }
     ipcSaveData(payload)     { return this._ipc('saveData', () => window.electronAPI.saveData(payload), { payload }); }
     ipcExportCSV(payload)    { return this._ipc('exportCSV', () => window.electronAPI.exportCSV(payload), { payload }); }
+    ipcGetAppInfo()          { return this._ipc('getAppInfo', () => window.electronAPI.getAppInfo()); }
     ipcGetSettings()         { return this._ipc('getSettings', () => window.electronAPI.getSettings()); }
     ipcSaveSettings(s)       { return this._ipc('saveSettings', () => window.electronAPI.saveSettings(s), { s }); }
     ipcChooseDirectory(p)    { return this._ipc('chooseDirectory', () => window.electronAPI.chooseDirectory(p), { defaultPath: p }); }
     ipcChooseSaveFile(o)     { return this._ipc('chooseSaveFile', () => window.electronAPI.chooseSaveFile(o), { opts: o }); }
+    ipcConfirmDialog(o)      { return this._ipc('confirmDialog', () => window.electronAPI.confirmDialog(o), { opts: o }); }
     ipcListHistory(o)        { return this._ipc('listHistory', () => window.electronAPI.listHistory(o), { opts: o }); }
     ipcReadFile(p)           { return this._ipc('readFile', () => window.electronAPI.readFile(p), { filePath: p }); }
     ipcDeleteFile(p)         { return this._ipc('deleteFile', () => window.electronAPI.deleteFile(p), { filePath: p }); }
+    ipcQuitApp()             { return this._ipc('quitApp', () => window.electronAPI.quitApp()); }
+    ipcMinimizeWindow()      { return this._ipc('minimizeWindow', () => window.electronAPI.minimizeWindow()); }
+    ipcToggleMaximize()      { return this._ipc('toggleMaximizeWindow', () => window.electronAPI.toggleMaximizeWindow()); }
 
     initializeElements() {
         this.barsContainer = document.getElementById('barsContainer');
@@ -112,8 +121,10 @@ class SortingVisualizer {
 
         this.exportDataBtn = document.getElementById('exportData');
         this.saveDataBtn = document.getElementById('saveDataBtn');
-        this.appInfoBtn = document.getElementById('appInfo');
         this.appSettingsBtn = document.getElementById('appSettings');
+        this.appQuitBtn = document.getElementById('appQuit');
+        this.appMinimizeBtn = document.getElementById('appMinimize');
+        this.appToggleMaximizeBtn = document.getElementById('appToggleMaximize');
 
         // 计时显示
         this.elapsedTimeEl = document.getElementById('elapsedTime');
@@ -124,6 +135,9 @@ class SortingVisualizer {
         this.defaultSavePathInput = document.getElementById('defaultSavePath');
         this.defaultExportPathInput = document.getElementById('defaultExportPath');
         this.sessionRunCountEl = document.getElementById('sessionRunCount');
+        this.appInfoNameEl = document.getElementById('appInfoName');
+        this.appInfoVersionEl = document.getElementById('appInfoVersion');
+        this.appInfoPlatformEl = document.getElementById('appInfoPlatform');
 
         // 左侧导航 + 测试数据页（新）
         this.leftRailTabs = document.querySelectorAll('.left-rail-tab');
@@ -171,6 +185,8 @@ class SortingVisualizer {
         for (let i = 0; i < n; i++) {
             this.array.push(Math.floor(Math.random() * 95) + 5);
         }
+        // 同步初始快照——重置时从此恢复
+        this.initialArray = [...this.array];
         this.resetStats();
         this.renderBars();
     }
@@ -185,14 +201,19 @@ class SortingVisualizer {
         this.isPaused = false;
         this.isStepMode = false;
         this.stepRequested = false;
-        this.sortSteps = [];
-        this.currentStep = 0;
         this.updateStats();
         this.updateElapsedDisplay();
         this.updateElapsedState('idle');
         this.updateStartButton('start');
         this.updateStepButton('enter');   // 复位为"进入单步"状态
         this.updateControlsState();       // 重新启用被锁的控件
+        // 关键：排序进行中重置（用户主动点重置 / 生成新数组 / 滑条），当前
+        // run 的数据不完整（endTime / finalArray / 比较交换次数等都不全），
+        // 不应作为"未保存"被保留。直接清空 currentSession，finally 块看到
+        // 为 null 时会跳过 recordSessionEnd，按钮也不会被覆盖为 'done'。
+        if (this.isSorting === false && this.currentSession) {
+            this.currentSession = null;
+        }
     }
     
     updateStats() {
@@ -271,8 +292,7 @@ class SortingVisualizer {
                 this.isPaused = !this.isPaused;
                 this.updateStartButton(this.isPaused ? 'resume' : 'pause');
             } else if (this.sortingComplete) {
-                // 排序完成 → 重置后立即再启动
-                this.generateRandomArray();
+                // 排序完成 → "再来一次"用本轮同一个数组重新跑（不重新随机生成）
                 this.startSorting();
             }
         });
@@ -280,7 +300,8 @@ class SortingVisualizer {
         // 单步执行按钮：
         //   - 排序中（不在单步模式）→ 暂停并进入单步模式
         //   - 单步模式中 → 推进一帧
-        //   - 初始 → 走 sortSteps 旧逻辑（不启动协程）
+        //   - 初始 → 先启动排序再进入单步模式（让单步对所有算法统一可用）；
+        //            旧 sortSteps 模式仅保留为兜底
         this.stepSortBtn.addEventListener('click', () => {
             if (this.isSorting && !this.isStepMode) {
                 this.isPaused = true;
@@ -292,18 +313,42 @@ class SortingVisualizer {
                 this.stepRequested = true;   // 标记：放行一次 sleep 后自动再暂停
                 this.isPaused = false;       // 唤醒 sleep()
             } else if (!this.isSorting && !this.sortingComplete) {
-                // 初始状态 → 沿用 sortSteps 模式（仅对 bubble/selection 有效）
-                this.stepSort();
+                // 初始：先启动排序 + 立即进入单步模式（不等排序完成再切）
+                this.startSorting();
+                this.isPaused = true;
+                this.isStepMode = true;
+                this.stepRequested = false;
+                this.updateStartButton('resume');
+                this.updateStepButton('next');
             }
         });
 
-        // 重置：先停掉协程，再清空状态
-        document.getElementById('reset').addEventListener('click', () => {
+        // 重置：恢复本次测试前的初始状态——
+        // 1) 协程可能正在交换 this.array，必须从快照恢复，不能用被改过的 this.array
+        // 2) 标记 resetRequested 让协程 finally 知道这是用户主动重置 → 不推入 sessionData
+        document.getElementById('reset').addEventListener('click', async () => {
+            // 先标记"重置"——必须在 isSorting=false 之前，
+            // 否则协程可能已经退出到 finally 看到标志还是 false
+            this.resetRequested = true;
+            // 停协程
             this.isSorting = false;
             this.isPaused = false;
             this.isStepMode = false;
             this.stepRequested = false;
-            this.generateRandomArray();
+            // 用快照恢复 this.array；如果快照为空则用 generateRandomArray 兜底
+            if (this.initialArray && this.initialArray.length > 0) {
+                this.array = [...this.initialArray];
+            } else {
+                this.generateRandomArray();
+                return;     // generateRandomArray 已完成 resetStats + renderBars
+            }
+            this.resetStats();
+            // 放一个微任务让协程退出（sleep 看到 !isSorting 立即 resolve），
+            // 协程退出后再渲染，避免协程的同步交换段在快照恢复后再次污染。
+            await new Promise(r => setTimeout(r, 0));
+            // 渲染时 resetRequested 仍为 true，协程 finally 看到后会判为
+            // "未完成" → 不推入 unsaved 数据。
+            this.renderBars();
         });
 
         // 数组大小：运行时锁定
@@ -566,6 +611,8 @@ class SortingVisualizer {
             for (let i = 0; i < newSize; i++) {
                 this.array.push(Math.floor(Math.random() * 95) + 5);
             }
+            // 同步快照，否则重置会用旧长度的快照
+            this.initialArray = [...this.array];
             if (typeof this.renderBars === 'function') this.renderBars();
         }
     }
@@ -595,19 +642,29 @@ class SortingVisualizer {
     }
     
     async startSorting() {
+        // 清旧重置请求（每轮排序重新开始）
+        this.resetRequested = false;
+        // "再来一次"：如果上轮已经排序完成，先把数组恢复到本轮初始快照再跑
+        if (this.sortingComplete && this.initialArray && this.initialArray.length > 0) {
+            this.array = [...this.initialArray];
+            this.renderBars();
+        }
+        // 关键：在协程启动 + 随机大小应用之后、recordSessionStart 之前，
+        // 把当前 this.array 冻结为快照——重置按钮靠这个快照恢复初始状态。
+        this.applyRandomArraySizeIfEnabled();  // 可能改 this.array 长度
+        this.initialArray = [...this.array];
         this.isSorting = true;
         this.isPaused = false;
         this.isStepMode = false;     // 启动新排序时强制退出单步模式
         this.stepRequested = false;
         this.elapsedMs = 0;
         this.updateElapsedDisplay();
-        // 🎲 随机参数（两个独立开关）：先抽数组大小（影响柱状图），再抽速度
-        this.applyRandomArraySizeIfEnabled();
+        // 🎲 随机速度
         this.applyRandomSortSpeedIfEnabled();
         this.startElapsedTimer();
         this.recordSessionStart();
         this.updateStartButton('pause');
-        this.updateStepButton('next');  // 单步按钮显示"下一步"（实际是"进入单步"）
+        this.updateStepButton('enter');  // 启动后单步按钮显示"单步执行"——点击进入单步模式
         this.updateControlsState();     // 锁住数组大小和生成新数组
         try {
             switch (this.currentAlgorithm) {
@@ -676,112 +733,60 @@ class SortingVisualizer {
                 break;
             }
         } catch (e) {
-            // 任意排序算法抛错时不至于把 UI 卡在"排序中"状态
-            console.error('排序过程异常:', e);
+            // 静默处理协程的"主动退出"信号（重置导致 sleep reject）
+            // ——不是真正的错误，不污染控制台
+            if (e && e.message !== 'sorting-stopped') {
+                console.error('排序过程异常:', e);
+            }
             this.stopElapsedTimer();
+            // 异常路径：当前 run 数据不完整，丢弃
+            this.currentSession = null;
         } finally {
+            // 关键：只有 currentSession 还在（即未在 resetStats 中被丢弃）且
+            // 不是用户主动"重置"触发的退出 → 才算完整完成
+            const runCompleted = this.currentSession !== null && !this.resetRequested;
             this.isSorting = false;
             this.isPaused = false;
             this.isStepMode = false;
             this.stepRequested = false;
-            this.sortingComplete = true;
+            this.sortingComplete = runCompleted;
             this.stopElapsedTimer();
-            this.updateBarColors([], [], Array.from({length: this.array.length}, (_, i) => i));
-            this.recordSessionEnd();
+            if (runCompleted) {
+                this.updateBarColors([], [], Array.from({length: this.array.length}, (_, i) => i));
+                this.recordSessionEnd();
+            } else {
+                // 中断 / 异常：彻底丢弃 currentSession；柱子颜色由 generateRandomArray
+                // 的 renderBars() / 上一次 updateBarColors 决定，不在这里强行覆盖
+                this.currentSession = null;
+            }
             this.renderDataPage();
-            this.updateStartButton('done');
+            // 重置 / 中断：保持 'start'（测试前初始状态）；只有完整完成才 'done'
+            this.updateStartButton(runCompleted ? 'done' : 'start');
             this.updateStepButton('enter');
             this.updateControlsState();   // 解锁数组大小和生成新数组
         }
     }
     
-    stepSort() {
-        if (this.sortSteps.length === 0) {
-            this.prepareSortSteps();
-        }
-        
-        if (this.currentStep < this.sortSteps.length) {
-            const step = this.sortSteps[this.currentStep];
-            this.array = step.array;
-            this.comparisons = step.comparisons;
-            this.swaps = step.swaps;
-            this.updateStats();
-            this.renderBars();
-            this.updateBarColors(step.activeIndices, step.comparingIndices, step.sortedIndices);
-            this.currentStep++;
-        } else {
-            this.sortingComplete = true;
-            this.updateBarColors([], [], Array.from({length: this.array.length}, (_, i) => i));
-        }
-    }
-    
-    prepareSortSteps() {
-        this.sortSteps = [];
-        const arrayCopy = [...this.array];
-        
-        switch (this.currentAlgorithm) {
-            case 'bubble':
-                this.bubbleSortSteps(arrayCopy);
-                break;
-            case 'selection':
-                this.selectionSortSteps(arrayCopy);
-                break;
-        }
-    }
-    
-    bubbleSortSteps(array) {
-        let steps = [];
-        let n = array.length;
-        let comparisons = 0;
-        let swaps = 0;
-        
-        for (let i = 0; i < n - 1; i++) {
-            for (let j = 0; j < n - i - 1; j++) {
-                comparisons++;
-                steps.push({
-                    array: [...array],
-                    comparisons: comparisons,
-                    swaps: swaps,
-                    activeIndices: [j],
-                    comparingIndices: [j + 1],
-                    sortedIndices: Array.from({length: i}, (_, k) => n - 1 - k)
-                });
-                
-                if (array[j] > array[j + 1]) {
-                    swaps++;
-                    [array[j], array[j + 1]] = [array[j + 1], array[j]];
-                    steps.push({
-                        array: [...array],
-                        comparisons: comparisons,
-                        swaps: swaps,
-                        activeIndices: [j, j + 1],
-                        comparingIndices: [],
-                        sortedIndices: Array.from({length: i}, (_, k) => n - 1 - k)
-                    });
-                }
-            }
-        }
-        
-        this.sortSteps = steps;
-    }
-    
     async bubbleSort() {
         let n = this.array.length;
-        
+
         for (let i = 0; i < n - 1; i++) {
             for (let j = 0; j < n - i - 1; j++) {
                 if (!this.isSorting) return;
-                
+
                 this.comparisons++;
                 this.updateBarColors([j], [j + 1], Array.from({length: i}, (_, k) => n - 1 - k));
                 await this.sleep();
-                
+                // 关键：await 后必须再检查一次，否则重置期间协程会污染刚恢复的 this.array
+                if (!this.isSorting) return;
+
                 if (this.array[j] > this.array[j + 1]) {
                     this.swaps++;
                     [this.array[j], this.array[j + 1]] = [this.array[j + 1], this.array[j]];
                     this.renderBars();
                     this.updateBarColors([j, j + 1], [], Array.from({length: i}, (_, k) => n - 1 - k));
                     await this.sleep();
+                    if (!this.isSorting) return;
                 }
                 this.updateStats();
             }
@@ -800,6 +805,7 @@ class SortingVisualizer {
                 this.comparisons++;
                 this.updateBarColors([i], [j, minIdx], Array.from({length: i}, (_, k) => k));
                 await this.sleep();
+                if (!this.isSorting) return;
                 
                 if (this.array[j] < this.array[minIdx]) {
                     minIdx = j;
@@ -812,6 +818,7 @@ class SortingVisualizer {
                 this.renderBars();
                 this.updateBarColors([i, minIdx], [], Array.from({length: i + 1}, (_, k) => k));
                 await this.sleep();
+                if (!this.isSorting) return;
             }
             
             this.updateStats();
@@ -831,6 +838,7 @@ class SortingVisualizer {
                 this.comparisons++;
                 this.updateBarColors([i], [j], Array.from({length: i}, (_, k) => k));
                 await this.sleep();
+                if (!this.isSorting) return;
                 
                 this.swaps++;
                 this.array[j + 1] = this.array[j];
@@ -839,6 +847,7 @@ class SortingVisualizer {
                 this.renderBars();
                 this.updateBarColors([j + 1], [], Array.from({length: i}, (_, k) => k));
                 await this.sleep();
+                if (!this.isSorting) return;
             }
             
             this.array[j + 1] = key;
@@ -846,7 +855,8 @@ class SortingVisualizer {
             this.renderBars();
             this.updateBarColors([j + 1], [], Array.from({length: i + 1}, (_, k) => k));
             await this.sleep();
-            
+            if (!this.isSorting) return;
+
             this.updateStats();
         }
     }
@@ -980,10 +990,12 @@ class SortingVisualizer {
                 if (!this.isSorting) return;
                 let temp = this.array[i];
                 let j = i;
-                this.comparisons++;
+                this.comparisons++;   // 初始比较：与远端元素比较前的占位
                 this.updateBarColors([i], [i - gap], []);
                 await this.sleep();
-                while (j >= gap && this.array[j - gap] > temp) {
+                while (j >= gap) {
+                    this.comparisons++;   // 实际比较：array[j-gap] vs temp
+                    if (this.array[j - gap] <= temp) break;
                     if (!this.isSorting) return;
                     this.swaps++;
                     this.array[j] = this.array[j - gap];
@@ -1766,12 +1778,20 @@ class SortingVisualizer {
             this.chartTypeToggleBtn.addEventListener('click', () => this.toggleChartType());
         }
 
-        if (this.appInfoBtn) {
-            this.appInfoBtn.addEventListener('click', () => this.showAppInfo());
-        }
-
         if (this.appSettingsBtn) {
             this.appSettingsBtn.addEventListener('click', () => this.openSettings());
+        }
+
+        if (this.appQuitBtn) {
+            this.appQuitBtn.addEventListener('click', () => this.quitApp());
+        }
+
+        // 工具栏窗口控制：最小化 / 切换全屏
+        if (this.appMinimizeBtn) {
+            this.appMinimizeBtn.addEventListener('click', () => this.minimizeWindow());
+        }
+        if (this.appToggleMaximizeBtn) {
+            this.appToggleMaximizeBtn.addEventListener('click', () => this.toggleMaximizeWindow());
         }
 
         // 模态框关闭：所有 .modal 内的 [data-close-modal] 都支持关闭（包括 fileDataModal）
@@ -1913,7 +1933,136 @@ class SortingVisualizer {
         if (this.defaultSavePathInput) this.defaultSavePathInput.value = this.appSettings.defaultSavePath || '';
         if (this.defaultExportPathInput) this.defaultExportPathInput.value = this.appSettings.defaultExportPath || '';
         if (this.sessionRunCountEl) this.sessionRunCountEl.textContent = String(this.sessionData.length);
+        this.refreshAppInfoInSettings();
         this.settingsModal.setAttribute('aria-hidden', 'false');
+    }
+
+    // 拉取并填充"关于"区块的版本号/平台信息
+    async refreshAppInfoInSettings() {
+        if (!this.appInfoVersionEl) return;
+        try {
+            if (window.electronAPI && window.electronAPI.getAppInfo) {
+                const info = await this.ipcGetAppInfo();
+                if (this.appInfoNameEl) this.appInfoNameEl.textContent = info && info.name ? info.name : '排序算法可视化';
+                if (this.appInfoVersionEl) this.appInfoVersionEl.textContent = info && info.version ? 'v' + info.version : '--';
+                if (this.appInfoPlatformEl) this.appInfoPlatformEl.textContent = info && info.platform ? info.platform : '--';
+            }
+        } catch (e) {
+            if (this.appInfoVersionEl) this.appInfoVersionEl.textContent = '--';
+            this._log('refreshAppInfoInSettings:error', { message: e && e.message });
+        }
+    }
+
+    // 工具栏"退出程序"按钮：弹出确认 → 调用 quit-app IPC
+    async quitApp() {
+        this._log('quitApp:enter');
+        try {
+            if (window.electronAPI && window.electronAPI.confirmDialog) {
+                // 1) 先看是否有未保存数据：是则三选项（保存并退出 / 不保存退出 / 取消）
+                if (this.unsavedCount > 0) {
+                    const resp = await this.ipcConfirmDialog({
+                        type: 'warning',
+                        title: '未保存的数据',
+                        message: `当前会话还有 ${this.unsavedCount} 条运行数据未保存到磁盘。`,
+                        detail: '选择"保存"会先把这些数据保存为磁盘文件，再退出程序。',
+                        buttons: ['保存并退出', '不保存退出', '取消'],
+                        defaultId: 0,
+                        cancelId: 2
+                    });
+                    if (resp === 2) {
+                        this._log('quitApp:cancel-by-user', { unsaved: this.unsavedCount });
+                        return;
+                    }
+                    if (resp === 0) {
+                        // 保存
+                        this._log('quitApp:save-then-quit', { unsaved: this.unsavedCount });
+                        try {
+                            await this.saveAllUnsaved();
+                        } catch (e) {
+                            this._log('quitApp:save-error', { message: e && e.message });
+                            // 保存失败：阻止退出，让用户看到错误
+                            await this.ipcConfirmDialog({
+                                type: 'error',
+                                title: '保存失败',
+                                message: '保存未保存数据时发生错误，已取消退出。',
+                                detail: (e && e.message) ? String(e.message) : '未知错误',
+                                buttons: ['确定'],
+                                defaultId: 0,
+                                cancelId: 0
+                            });
+                            return;
+                        }
+                        // 如果保存后还有残留（部分保存失败），再问一次
+                        if (this.unsavedCount > 0) {
+                            const resp2 = await this.ipcConfirmDialog({
+                                type: 'warning',
+                                title: '部分数据未保存',
+                                message: `仍有 ${this.unsavedCount} 条数据未成功保存，是否仍要退出？`,
+                                buttons: ['仍要退出', '取消'],
+                                defaultId: 1,
+                                cancelId: 1
+                            });
+                            if (resp2 !== 0) {
+                                this._log('quitApp:cancel-after-partial-save');
+                                return;
+                            }
+                        }
+                    }
+                    // resp === 1: 不保存退出 → 继续
+                } else {
+                    // 2) 无未保存数据：常规确认
+                    const response = await this.ipcConfirmDialog({
+                        type: 'warning',
+                        title: '退出程序',
+                        message: '确定要退出 排序算法可视化 吗？',
+                        detail: '未保存的运行数据会保留在内存中，关闭后不会保留。',
+                        buttons: ['退出', '取消'],
+                        defaultId: 1,
+                        cancelId: 1
+                    });
+                    if (response !== 0) {
+                        this._log('quitApp:cancel', { response });
+                        return;
+                    }
+                }
+            }
+        } catch (e) {
+            this._log('quitApp:confirm-error', { message: e && e.message });
+        }
+        try {
+            if (window.electronAPI && window.electronAPI.quitApp) {
+                await this.ipcQuitApp();
+            } else {
+                window.close();
+            }
+        } catch (e) {
+            this._log('quitApp:error', { message: e && e.message });
+            console.error('退出程序失败:', e);
+        }
+    }
+
+    // 工具栏"最小化"按钮：直接调用主进程最小化窗口
+    async minimizeWindow() {
+        this._log('minimizeWindow:enter');
+        try {
+            if (window.electronAPI && window.electronAPI.minimizeWindow) {
+                await this.ipcMinimizeWindow();
+            }
+        } catch (e) {
+            this._log('minimizeWindow:error', { message: e && e.message });
+        }
+    }
+
+    // 工具栏"切换全屏"按钮：调用主进程切换最大化状态
+    async toggleMaximizeWindow() {
+        this._log('toggleMaximizeWindow:enter');
+        try {
+            if (window.electronAPI && window.electronAPI.toggleMaximizeWindow) {
+                await this.ipcToggleMaximize();
+            }
+        } catch (e) {
+            this._log('toggleMaximizeWindow:error', { message: e && e.message });
+        }
     }
 
     closeSettings() {
@@ -3730,35 +3879,7 @@ class SortingVisualizer {
         const text = (opts && opts.message) + ((opts && opts.detail) ? '\n\n' + opts.detail : '');
         return window.confirm(text) ? 0 : 1;
     }
-    
-    async showAppInfo() {
-        try {
-            if (window.electronAPI) {
-                const appInfo = await window.electronAPI.getAppInfo();
-                alert(
-                    `应用信息:\n` +
-                    `名称: ${appInfo.name}\n` +
-                    `版本: ${appInfo.version}\n` +
-                    `平台: ${appInfo.platform}\n` +
-                    `已记录运行数: ${this.sessionData.length}\n` +
-                    `未保存运行数: ${this.unsavedCount}\n` +
-                    `默认保存路径: ${this.appSettings.defaultSavePath || '(未设置)'}\n` +
-                    `默认导出路径: ${this.appSettings.defaultExportPath || '(未设置)'}`
-                );
-            } else {
-                alert(
-                    `应用信息:\n` +
-                    `名称: 排序算法可视化测试\n` +
-                    `版本: 1.1.2 (Web版)\n` +
-                    `已记录运行数: ${this.sessionData.length}\n` +
-                    `未保存运行数: ${this.unsavedCount}`
-                );
-            }
-        } catch (error) {
-            console.error('获取应用信息失败:', error);
-        }
-    }
-    
+
     generateCSV() {
         const headers = [
             '算法代码', '算法名称', '数组大小', '模式',
@@ -3818,18 +3939,22 @@ class SortingVisualizer {
     
     sleep() {
         // 三种等待：
-        //   1. isSorting=false → 立即放行（被重置）
+        //   1. isSorting=false → 立即 reject（被重置/停止，让协程立即冒泡到 startSorting 的 catch）
         //   2. isPaused=true  → 50ms 轮询等待（暂停中）
         //   3. 正常 → 等满 speed 才放行
         //
         // 单步推进机制：
         //   当 stepRequested=true 时，当前 sleep 放行后立刻把 isPaused 置回 true，
         //   相当于"放行一帧"——算法会从当前 sleep 边界推进到下一个 sleep 边界。
-        return new Promise(resolve => {
+        //
+        // 关键：reset 期间 isSorting=false 时 sleep 必须 reject 而不是 resolve，
+        // 这样协程在 await sleep() 后不会继续执行交换/renderBars 等副作用，
+        // 避免污染已恢复的 this.array；异常会冒泡到 startSorting 的 catch/finally。
+        return new Promise((resolve, reject) => {
             const start = Date.now();
             const tick = () => {
                 if (!this.isSorting) {
-                    resolve();
+                    reject(new Error('sorting-stopped'));
                     return;
                 }
                 if (this.isPaused) {

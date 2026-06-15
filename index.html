@@ -3,25 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>排序算法可视化测试 - 桌面版</title>
+    <title>排序算法可视化</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <!-- ==================== 应用工具栏 ==================== -->
     <header class="app-toolbar">
         <div class="toolbar-brand">
-            <span class="toolbar-icon">📊</span>
-            <span class="toolbar-version">v1.1.2</span>
+            <button id="appSettings" class="toolbar-btn" title="应用设置">
+                <span class="btn-icon">⚙️</span>
+                <span class="btn-text">设置</span>
+            </button>
         </div>
         <div class="toolbar-title-block">
             <h1 class="toolbar-title">排序算法可视化</h1>
             <p class="toolbar-subtitle">直观展示不同排序算法的工作原理和性能表现</p>
         </div>
         <div class="toolbar-spacer"></div>
-        <nav class="toolbar-actions">
-            <button id="appSettings" class="toolbar-btn" title="应用设置">
-                <span class="btn-icon">⚙️</span>
-                <span class="btn-text">设置</span>
+        <nav class="toolbar-actions toolbar-window-controls">
+            <button id="appMinimize" class="toolbar-btn toolbar-btn-control" title="最小化">
+                <span class="btn-icon">⬇</span>
+                <span class="btn-text">最小化</span>
+            </button>
+            <button id="appToggleMaximize" class="toolbar-btn toolbar-btn-control" title="切换全屏">
+                <span class="btn-icon">⛶</span>
+                <span class="btn-text">全屏</span>
+            </button>
+            <button id="appQuit" class="toolbar-btn toolbar-btn-quit" title="退出程序">
+                <span class="btn-icon">⏻</span>
+                <span class="btn-text">退出程序</span>
             </button>
         </nav>
     </header>
@@ -62,10 +72,13 @@
                             <span class="btn-text">导出数据</span>
                         </button>
                         <button class="data-action-btn data-chart-toggle-btn" id="chartTypeToggle" data-chart-type="bar" title="当前：柱状图（点击切换为散点图）" aria-label="切换图表类型">
-                            <span class="chart-toggle-icon">📊</span>
-                            <span class="chart-toggle-text">柱状图</span>
+                            <span class="btn-icon chart-toggle-icon">📊</span>
+                            <span class="btn-text chart-toggle-text">柱状图</span>
                         </button>
-                        <button class="data-action-btn data-save-all-btn" id="saveAllUnsaved" title="把当前所有未保存运行一次性保存为磁盘文件">💾 一键保存</button>
+                        <button class="data-action-btn data-save-all-btn" id="saveAllUnsaved" title="把当前所有未保存运行一次性保存为磁盘文件">
+                            <span class="btn-icon">💾</span>
+                            <span class="btn-text">一键保存</span>
+                        </button>
                     </div>
                 </div>
 
@@ -333,9 +346,15 @@
                 </div>
                 <div class="settings-group">
                     <h3 class="settings-group-title">ℹ️ 关于</h3>
-                    <p class="settings-group-hint">查看应用名称、版本与运行环境</p>
-                    <div class="settings-row">
-                        <button class="settings-browse-btn" id="appInfo" title="查看应用信息">应用信息</button>
+                    <p class="settings-group-hint">应用名称、版本号与运行环境</p>
+                    <div class="settings-row settings-info-row">
+                        <span class="settings-info">应用名称：<b id="appInfoName">排序算法可视化</b></span>
+                    </div>
+                    <div class="settings-row settings-info-row">
+                        <span class="settings-info">当前版本：<b id="appInfoVersion">--</b></span>
+                    </div>
+                    <div class="settings-row settings-info-row">
+                        <span class="settings-info">运行环境：<b id="appInfoPlatform">--</b></span>
                     </div>
                 </div>
             </div>
